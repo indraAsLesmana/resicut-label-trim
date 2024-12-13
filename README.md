@@ -1,6 +1,6 @@
 # Label Trimmer
 
-A Python tool to automatically trim excess white space from PDF shipping labels. This tool processes PDF files by removing unnecessary white space from the bottom and right sides while maintaining the label's quality. Specifically designed for handling Shopee Indonesia airway bill/shipping labels that often come with excessive white space.
+A Python tool specifically designed for processing Shopee Indonesia airway bills, automatically trimming and arranging them to fit two labels per A6 paper. This tool optimizes shipping label layouts for efficient printing and paper usage.
 
 ## Features
 
@@ -9,6 +9,10 @@ A Python tool to automatically trim excess white space from PDF shipping labels.
 - Supports multi-page PDF files
 - Preserves label content with safe padding
 - Optimized for Shopee Indonesia airway bill/shipping labels
+- Automatically fits 2 shipping labels per A6 page
+- Centers labels horizontally
+- Maintains aspect ratio while resizing
+- Optimizes space usage while keeping label readability
 
 ## Use Cases
 

@@ -3,6 +3,14 @@ from PIL import Image
 import numpy as np
 import os
 
+# A6 dimensions in pixels at 300 DPI
+A6_WIDTH = int(4.1 * 300)  # 1230 pixels
+A6_HEIGHT = int(5.8 * 300)  # 1740 pixels
+
+# Target dimensions for each label (half of A6 height)
+TARGET_WIDTH = A6_WIDTH
+TARGET_HEIGHT = A6_HEIGHT // 2  # Half of A6 height
+
 def find_content_boundaries(image):
     # Convert image to numpy array
     img_array = np.array(image)
@@ -21,36 +29,77 @@ def find_content_boundaries(image):
     if len(rows_with_content) == 0 or len(cols_with_content) == 0:
         return image.height, image.width
     
-    # Add padding to both bottom and right
-    padding = 20  # Adjust this value as needed
-    last_content_row = rows_with_content[-1]
-    last_content_col = cols_with_content[-1]
+    # Get first and last content positions
+    first_row = rows_with_content[0]
+    last_row = rows_with_content[-1]
+    first_col = cols_with_content[0]
+    last_col = cols_with_content[-1]
     
-    bottom_boundary = min(last_content_row + padding, image.height)
-    right_boundary = min(last_content_col + padding, image.width)
+    # Add padding
+    padding = 20
+    top = max(0, first_row - padding)
+    bottom = min(last_row + padding, image.height)
+    left = max(0, first_col - padding)
+    right = min(last_col + padding, image.width)
     
-    return bottom_boundary, right_boundary
+    return top, bottom, left, right
+
+def resize_to_target(image):
+    """Resize image to fit within target dimensions while maintaining aspect ratio"""
+    aspect = image.width / image.height
+    target_aspect = TARGET_WIDTH / TARGET_HEIGHT
+    
+    if aspect > target_aspect:
+        # Width is the limiting factor
+        new_width = TARGET_WIDTH
+        new_height = int(TARGET_WIDTH / aspect)
+    else:
+        # Height is the limiting factor
+        new_height = TARGET_HEIGHT
+        new_width = int(TARGET_HEIGHT * aspect)
+    
+    return image.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
 def process_shipping_label(input_path, output_path):
     # Convert PDF to images
     pages = convert_from_path(input_path, dpi=300)
     
     processed_images = []
+    current_page = Image.new('RGB', (A6_WIDTH, A6_HEIGHT), 'white')
+    y_offset = 0
+    label_count = 0
     
     for page in pages:
-        # Find both bottom and right boundaries
-        bottom_boundary, right_boundary = find_content_boundaries(page)
+        # Find content boundaries
+        top, bottom, left, right = find_content_boundaries(page)
         
-        # Crop the image from all sides
-        cropped_image = page.crop((0, 0, right_boundary, bottom_boundary))
+        # Crop the image
+        cropped_image = page.crop((left, top, right, bottom))
         
-        # Convert to RGB mode if necessary
-        if cropped_image.mode != 'RGB':
-            cropped_image = cropped_image.convert('RGB')
-            
-        processed_images.append(cropped_image)
+        # Resize to fit target dimensions
+        resized_image = resize_to_target(cropped_image)
+        
+        # Calculate centering position
+        x_center = (A6_WIDTH - resized_image.width) // 2
+        
+        # If this is the first label on the page or there's space
+        if label_count % 2 == 0:
+            y_offset = 0
+            if label_count > 0:
+                processed_images.append(current_page)
+            current_page = Image.new('RGB', (A6_WIDTH, A6_HEIGHT), 'white')
+        else:
+            y_offset = TARGET_HEIGHT
+        
+        # Paste the image onto the current page
+        current_page.paste(resized_image, (x_center, y_offset))
+        label_count += 1
     
-    # Save the first image as PDF
+    # Add the last page if it has any content
+    if label_count % 2 != 0 or label_count == 0:
+        processed_images.append(current_page)
+    
+    # Save as PDF
     if processed_images:
         processed_images[0].save(
             output_path,
